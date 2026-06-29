@@ -14,36 +14,42 @@ module.exports = async (req, res) => {
   let { url, format } = req.query;
   if (!url) return res.status(400).json({ error: 'URL is required' });
 
-  // Otomatis ngebersihin parameter tracking (?si=) dari URL YouTube
+  // Bersihin URL dari parameter aneh-aneh (?si=)
   url = url.split('?')[0]; 
 
   try {
-    const response = await axios.post('https://co.wuk.sh/api/json', {
-      url: url,
-      isAudioOnly: format === 'mp3',
-      aFormat: format === 'mp3' ? 'mp3' : 'best'
-    }, {
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
+    // BACKUP PLAN 1: API Siputzx
+    try {
+      const res1 = await axios.get(`https://api.siputzx.my.id/api/d/yt${format}?url=${url}`);
+      if (res1.data && res1.data.data && res1.data.data.dl) {
+        return res.status(200).json({
+          title: res1.data.data.title || 'Download Siap!',
+          format: format,
+          download: res1.data.data.dl
+        });
       }
-    });
-    
-    const data = response.data;
-    
-    if (data.status === 'error' || !data.url) {
-      return res.status(500).json({ error: data.text || 'Video dibatasi atau API sedang sibuk.' });
+    } catch (e) {
+      // Kalau gagal, lanjut ke plan 2
     }
-    
-    return res.status(200).json({
-      title: "Download Siap!",
-      format: format || 'mp4',
-      download: data.url
-    });
+
+    // BACKUP PLAN 2: API Ryzendesu
+    try {
+      const res2 = await axios.get(`https://api.ryzendesu.vip/api/downloader/yt${format}?url=${url}`);
+      if (res2.data && res2.data.url) {
+        return res.status(200).json({
+          title: res2.data.title || 'Download Siap!',
+          format: format,
+          download: res2.data.url
+        });
+      }
+    } catch (e) {
+      // Kalau gagal juga, lempar error ke bawah
+    }
+
+    // Kalau kedua API tepar
+    throw new Error('Semua REST API publik lagi down');
 
   } catch (error) {
-    // Biar lu bisa liat error aslinya di tab Logs Vercel
-    console.error("API Error Details:", error.response ? error.response.data : error.message);
-    return res.status(500).json({ error: 'Gagal koneksi ke server penyedia. Cek log Vercel.' });
+    return res.status(500).json({ error: 'Server penyedia lagi sibuk/down. Coba klik download sekali lagi.' });
   }
 };
